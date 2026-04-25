@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aesthetic Lofi Audio Player - Final</title>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Hind Siliguri', sans-serif;
+        }
+
+        body {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #050505;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Background Panning */
+        @keyframes slowPan {
+            0% { transform: scale(1.1) translate(0px, 0px); }
+            50% { transform: scale(1.2) translate(-15px, 15px); }
+            100% { transform: scale(1.1) translate(0px, 0px); }
+        }
+
+        #bg-video-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: blur(30px) brightness(0.4);
+            z-index: 1; /* Lowest */
+            animation: slowPan 25s ease-in-out infinite;
+        }
+
+        .vignette {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.85) 100%);
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        /* 2. Snow Falling (Now OVER the frame) */
+        #particles-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10; /* Higher than player (z-index: 5) */
+            pointer-events: none; /* So you can still click the player underneath */
+        }
+
+        /* Floating Animation */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-12px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .player-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 310px; /* Slightly compact */
+            height: 310px;
+            animation: float 6s ease-in-out infinite;
+            z-index: 5; /* Player is under the snow */
+        }
+
+        /* Glowing Pulse */
+        @keyframes pulseGlow {
+            0% { box-shadow: -5px 10px 30px rgba(0, 0, 0, 0.7), 0 0 10px rgba(255, 255, 255, 0.05); }
+            50% { box-shadow: -5px 10px 30px rgba(0, 0, 0, 0.7), 0 0 35px rgba(255, 255, 255, 0.25); }
+            100% { box-shadow: -5px 10px 30px rgba(0, 0, 0, 0.7), 0 0 10px rgba(255, 255, 255, 0.05); }
+        }
+
+        .player-wrapper.is-playing .player-card {
+            animation: pulseGlow 2.5s ease-in-out infinite;
+        }
+
+        /* Vinyl Record */
+        .vinyl-record {
+            position: absolute;
+            right: -45px;
+            width: 250px;
+            height: 250px;
+            background: 
+                radial-gradient(circle, #111 10%, transparent 11%),
+                radial-gradient(circle, #ff5722 10%, #ff5722 20%, transparent 21%),
+                radial-gradient(circle, #222 20%, #111 100%);
+            border-radius: 50%;
+            z-index: 4; /* Behind card */
+            box-shadow: 10px 10px 25px rgba(0,0,0,0.9);
+            border: 2px solid #222;
+            background-image: repeating-radial-gradient(#111, #111 4px, #222 5px, #222 6px);
+            animation: spin 4s linear infinite;
+            animation-play-state: paused;
+        }
+
+        .vinyl-record::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            background: url('https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=200&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+            border-radius: 50%;
+            border: 2px solid #000;
+        }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Main Player Card */
+        .player-card {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            border-radius: 16px;
+            overflow: hidden;
+            z-index: 5;
+            box-shadow: -5px 10px 30px rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 30px 20px 20px 20px;
+            background: rgba(0,0,0,0.3); /* Base fallback */
+        }
+
+        #card-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -1;
+            /* Default Blur applied here */
+            filter: blur(2px) brightness(0.5); 
+            transition: transform 10s linear;
+        }
+
+        .player-wrapper.is-playing #card-bg { transform: scale(1.08); }
+
+        /* Text Section */
+        .text-section {
+            text-align: center;
+            color: white;
+            margin-top: 20px;
+            text-shadow: 0px 4px 15px rgba(0, 0, 0, 0.9);
+        }
+
+        .track-title {
+            font-size: 24px;
+            font-weight: 700;
+            outline: none;
+            margin-bottom: 2px;
+            letter-spacing: 0.5px;
+        }
+
+        .track-artist {
+            font-size: 14px;
+            font-weight: 400;
+            color: #ccc;
+            outline: none;
+        }
+
+        .bottom-section { width: 100%; }
+
+        /* 3. Stylish Progress Bar Area */
+        .progress-area {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: #d3d3d3;
+            font-size: 10px; /* Smaller text */
+            margin-bottom: 8px;
+            text-shadow: 0px 2px 5px rgba(0,0,0,0.8);
+            font-family: sans-serif;
+            font-weight: 600;
+            padding: 0 5px;
+        }
+
+        .progress-bar-wrapper {
+            position: relative;
+            width: 90%; /* Smaller width to look stylish */
+            height: 12px;
+            display: flex;
+            align-items: center;
+            margin: 0 auto 15px auto;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 3px; /* Thinner track */
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            outline: none;
+            cursor: pointer;
+            z-index: 2;
+        }
+
+        /* Stylish Thumb (The dot) */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.3);
+        }
+
+        /* Glowing Fill */
+        .progress-fill {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            transform: translateY(-50%);
+            height: 3px;
+            background: linear-gradient(90deg, rgba(255,255,255,0.4), #fff);
+            border-radius: 5px;
+            width: 0%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 35px;
+            margin-bottom: 12px;
+        }
+
+        .controls button {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            filter: drop-shadow(0px 3px 6px rgba(0,0,0,0.6));
+            transition: transform 0.2s, color 0.2s;
+        }
+
+        .controls button:hover { color: #1db954; }
+        .controls button:active { transform: scale(0.8); }
+
+        #play-pause-btn { font-size: 26px; }
+
+        /* Logo */
+        .spotify-logo {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: #1db954;
+            font-size: 11px;
+            font-family: sans-serif;
+            font-weight: bold;
+            text-shadow: 0px 2px 4px rgba(0,0,0,0.8);
+            justify-content: flex-start;
+            padding-left: 5px;
+        }
+        .spotify-logo span { color: white; }
+
+        /* Setup Panel */
+        .setup-panel {
+            position: absolute;
+            bottom: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 20; /* Highest priority */
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            backdrop-filter: blur(10px);
+            width: 280px;
+        }
+
+        .setup-panel label { font-size: 12px; font-weight: bold; color: #333;}
+        .setup-panel input[type="file"] { font-size: 11px; }
+        
+        /* Custom Blur Slider Styling */
+        .blur-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #blur-slider {
+            flex-grow: 1;
+            height: 4px;
+            background: #ddd;
+            border-radius: 5px;
+        }
+        #blur-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            background: #ff4757;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .hide-btn {
+            background: linear-gradient(45deg, #ff4757, #ff6b81);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(255, 71, 87, 0.4);
+            margin-top: 5px;
+        }
+
+        .show-btn {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            opacity: 0.3;
+            transition: opacity 0.3s;
+            z-index: 20;
+        }
+        .show-btn:hover { opacity: 1; }
+
+    </style>
+</head>
+<body>
+
+    <img id="bg-video-image" src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=1000&auto=format&fit=crop" alt="bg">
+    <div class="vignette"></div>
+    
+    <!-- Canvas is now above the player -->
+    <canvas id="particles-canvas"></canvas>
+
+    <div class="player-wrapper" id="player-wrapper">
+        <div class="vinyl-record" id="vinyl"></div>
+
+        <div class="player-card">
+            <img id="card-bg" src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=500&auto=format&fit=crop" alt="card bg">
+
+            <div class="text-section">
+                <div class="track-title" contenteditable="true" spellcheck="false">তোমার অভিসারে</div>
+                <div class="track-artist" contenteditable="true" spellcheck="false">(slowed reverb)</div>
+            </div>
+
+            <div class="bottom-section">
+                <div class="progress-area">
+                    <span id="current-time">-00:00</span>
+                    <span id="artist-name-small" contenteditable="true" spellcheck="false">MAMUN MUSIC</span>
+                    <span id="total-time">00:00</span>
+                </div>
+                
+                <div class="progress-bar-wrapper">
+                    <input type="range" id="seek-bar" value="0" min="0" max="100">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+
+                <div class="controls">
+                    <button id="prev-btn"><i class="fas fa-backward-step"></i></button>
+                    <button id="play-pause-btn"><i class="fas fa-play"></i></button>
+                    <button id="next-btn"><i class="fas fa-forward-step"></i></button>
+                </div>
+
+                <div class="spotify-logo">
+                    <i class="fab fa-spotify"></i> <span>Spotify</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Panel -->
+    <div class="setup-panel" id="setup-panel">
+        <label>১. অডিও দিন:</label>
+        <input type="file" id="audio-upload" accept="audio/*">
+        
+        <label>২. ছবি দিন:</label>
+        <input type="file" id="image-upload" accept="image/*">
+        
+        <label>৩. ফ্রেমের ব্লার লেভেল:</label>
+        <div class="blur-control">
+            <input type="range" id="blur-slider" min="0" max="15" value="2" step="0.5">
+        </div>
+        
+        <button class="hide-btn" onclick="document.getElementById('setup-panel').style.display='none'">প্যানেল লুকান (রেকর্ড করুন)</button>
+    </div>
+
+    <button class="show-btn" onclick="document.getElementById('setup-panel').style.display='flex'">Setup</button>
+
+    <audio id="audio-player"></audio>
+
+    <script>
+        // --- Setup Variables ---
+        const audioPlayer = document.getElementById('audio-player');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const seekBar = document.getElementById('seek-bar');
+        const progressFill = document.getElementById('progress-fill');
+        const currentTimeEl = document.getElementById('current-time');
+        const totalTimeEl = document.getElementById('total-time');
+        const audioUpload = document.getElementById('audio-upload');
+        const imageUpload = document.getElementById('image-upload');
+        const blurSlider = document.getElementById('blur-slider');
+        const bgVideoImage = document.getElementById('bg-video-image');
+        const cardBg = document.getElementById('card-bg');
+        const vinyl = document.getElementById('vinyl');
+        const playerWrapper = document.getElementById('player-wrapper');
+
+        let isPlaying = false;
+        playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+
+        // --- Frame Image Blur Control Logic ---
+        blurSlider.addEventListener('input', () => {
+            // Adjusts blur dynamically while keeping the dark brightness
+            cardBg.style.filter = `blur(${blurSlider.value}px) brightness(0.5)`;
+        });
+
+        // --- Audio Logic ---
+        playPauseBtn.addEventListener('click', () => {
+            if (!audioPlayer.src) {
+                alert("দয়া করে আগে একটি অডিও আপলোড করুন!");
+                return;
+            }
+            if (isPlaying) {
+                audioPlayer.pause();
+                playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+                vinyl.style.animationPlayState = 'paused';
+                playerWrapper.classList.remove('is-playing');
+            } else {
+                audioPlayer.play();
+                playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                vinyl.style.animationPlayState = 'running';
+                playerWrapper.classList.add('is-playing');
+            }
+            isPlaying = !isPlaying;
+        });
+
+        audioPlayer.addEventListener('timeupdate', () => {
+            if (audioPlayer.duration) {
+                const progressPercent = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+                seekBar.value = progressPercent;
+                progressFill.style.width = progressPercent + '%';
+                const timeRemaining = audioPlayer.duration - audioPlayer.currentTime;
+                currentTimeEl.textContent = "-" + formatTime(timeRemaining);
+            }
+        });
+
+        audioPlayer.addEventListener('loadedmetadata', () => {
+            totalTimeEl.textContent = formatTime(audioPlayer.duration);
+            currentTimeEl.textContent = "-" + formatTime(audioPlayer.duration);
+        });
+
+        seekBar.addEventListener('input', () => {
+            if (audioPlayer.duration) {
+                const seekTime = (seekBar.value / 100) * audioPlayer.duration;
+                audioPlayer.currentTime = seekTime;
+                progressFill.style.width = seekBar.value + '%';
+            }
+        });
+
+        audioUpload.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const objectURL = URL.createObjectURL(file);
+                audioPlayer.src = objectURL;
+                playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+                isPlaying = false;
+                vinyl.style.animationPlayState = 'paused';
+                playerWrapper.classList.remove('is-playing');
+                seekBar.value = 0;
+                progressFill.style.width = '0%';
+            }
+        });
+
+        imageUpload.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const objectURL = URL.createObjectURL(file);
+                bgVideoImage.src = objectURL;
+                cardBg.src = objectURL;
+                const style = document.createElement('style');
+                style.innerHTML = `.vinyl-record::after { background: url('${objectURL}') center/cover !important; }`;
+                document.head.appendChild(style);
+            }
+        });
+
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return "00:00";
+            const min = Math.floor(seconds / 60);
+            const sec = Math.floor(seconds % 60);
+            return `${min < 10 ? '0' : ''}${min}:${sec < 10 ? '0' : ''}${sec}`;
+        }
+
+        // --- Snow Falling Animation Logic ---
+        const canvas = document.getElementById('particles-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const particlesArray = [];
+        const numberOfParticles = 85; 
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2 + 0.5; 
+                this.speedX = Math.random() * 1 - 0.5; 
+                this.speedY = Math.random() * 1 + 0.2; 
+                this.opacity = Math.random() * 0.6 + 0.1;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                if (this.y > canvas.height) {
+                    this.y = 0 - this.size;
+                    this.x = Math.random() * canvas.width;
+                }
+            }
+            draw() {
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.opacity})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            for (let i = 0; i < numberOfParticles; i++) {
+                particlesArray.push(new Particle());
+            }
+        }
+        initParticles();
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < particlesArray.length; i++) {
+                particlesArray[i].update();
+                particlesArray[i].draw();
+            }
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+    </script>
+</body>
+</html>
